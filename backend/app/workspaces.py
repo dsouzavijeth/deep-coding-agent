@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import string
 import subprocess
 import uuid
 from pathlib import Path
@@ -151,6 +152,65 @@ async def create_repo(req: NewRepo, request: Request) -> dict:
 async def get_config() -> dict:
     """Defaults the UI can show (e.g. the suggested clone directory)."""
     return {"workspaces_dir": str(WORKSPACES), "graphify": settings.enable_graphify}
+
+
+@router.get("/fs/list")
+async def fs_list(path: str | None = None) -> dict:
+    """List directories on the host, to power a server-side folder picker.
+
+    SECURITY: this exposes the host's directory structure to anything that can
+    reach the backend. It's fine for local single-user dev (the agent already
+    has full host access), but REMOVE or lock this down for any networked or
+    multi-user deployment.
+    """
+    # No path → top level: Windows drive letters, or "/" on POSIX.
+    if not path:
+        if os.name == "nt":
+            roots = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").exists()]
+            return {
+                "path": "",
+                "parent": None,
+                "entries": [{"name": r, "path": r} for r in roots],
+            }
+        path = "/"
+
+    p = Path(path).expanduser()
+    if not p.is_dir():
+        raise HTTPException(400, "not a directory")
+    p = p.resolve()
+
+    entries = []
+    try:
+        for child in sorted(p.iterdir(), key=lambda c: c.name.lower()):
+            if child.is_dir() and not child.name.startswith("."):
+                entries.append({"name": child.name, "path": str(child)})
+    except PermissionError:
+        pass
+
+    # "" parent means "go back to the drive list / root".
+    parent = "" if p.parent == p else str(p.parent)
+    return {"path": str(p), "parent": parent, "entries": entries}
+
+
+@router.get("/browse")
+async def browse(path: str | None = None) -> dict:
+    """List subdirectories of a path, for the UI folder picker.
+
+    The backend runs on your machine, so this browses your real filesystem —
+    fine for local dev. Do NOT expose this server to untrusted networks.
+    """
+    base = (Path(path).expanduser() if path else Path.home()).resolve()
+    if not base.is_dir():
+        raise HTTPException(400, "not a directory")
+    dirs: list[str] = []
+    try:
+        for entry in sorted(base.iterdir(), key=lambda p: p.name.lower()):
+            if entry.is_dir() and not entry.name.startswith("."):
+                dirs.append(entry.name)
+    except PermissionError:
+        pass
+    parent = str(base.parent) if base.parent != base else None
+    return {"path": str(base), "parent": parent, "dirs": dirs}
 
 
 @router.get("/repos/{repo_id}/tree")

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { openRepo, type RepoSession } from "./FileTree";
+import { FolderBrowser } from "./FolderBrowser";
 
 const BACKEND =
   process.env.NEXT_PUBLIC_AGENT_BACKEND ?? "http://localhost:8000";
@@ -16,8 +17,8 @@ export function RepoOpener({
   const [defaultDir, setDefaultDir] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [browsing, setBrowsing] = useState(false);
 
-  // Show the suggested clone directory as a hint.
   useEffect(() => {
     fetch(`${BACKEND}/config`)
       .then((r) => (r.ok ? r.json() : null))
@@ -34,7 +35,6 @@ export function RepoOpener({
       const isUrl = /^(https?:\/\/|git@)/.test(v);
       const session = await openRepo({
         ...(isUrl ? { gitUrl: v } : { localPath: v }),
-        // Destination only applies to clones; local paths load in place.
         ...(isUrl && dest.trim() ? { dest: dest.trim() } : {}),
       });
       onOpen(session);
@@ -62,18 +62,33 @@ export function RepoOpener({
       </div>
 
       {looksLikeUrl && (
-        <input
-          className="dest-input"
-          value={dest}
-          onChange={(e) => setDest(e.target.value)}
-          placeholder={`clone into… (default: ${defaultDir || "./workspaces"}/<id>)`}
-        />
+        <div className="dest-row">
+          <input
+            className="dest-input"
+            value={dest}
+            onChange={(e) => setDest(e.target.value)}
+            placeholder={`clone into… (default: ${defaultDir || "./workspaces"}/<id>)`}
+          />
+          <button className="browse-btn" onClick={() => setBrowsing(true)}>
+            Browse…
+          </button>
+        </div>
       )}
 
       {error && (
         <div style={{ color: "#b00", fontSize: 12, margin: "8px 0 12px" }}>
           {error}
         </div>
+      )}
+
+      {browsing && (
+        <FolderBrowser
+          onClose={() => setBrowsing(false)}
+          onPick={(p) => {
+            setDest(p);
+            setBrowsing(false);
+          }}
+        />
       )}
     </div>
   );
