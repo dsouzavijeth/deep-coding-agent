@@ -1,0 +1,28 @@
+# Core agent harness + models
+deepagents
+langchain-openai      # Nebius Token Factory (OpenAI-compatible) + other OpenAI-style APIs
+langchain-anthropic   # optional fallback provider
+
+# API + server
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+pydantic-settings
+watchfiles            # filesystem watcher for live tree/viewer updates
+
+# LangGraph runtime + durable state (MongoDB checkpointer)
+langgraph
+langgraph-checkpoint-mongodb
+pymongo
+
+# AG-UI protocol + CopilotKit adapter for LangGraph
+ag-ui-langgraph
+copilotkit
+
+# Optional: per-repo graphify knowledge-graph tool (set ENABLE_GRAPHIFY=true).
+# Requires graphify itself in this env:  pip install "graphifyy[mcp]"
+langchain-mcp-adapters
+
+# NOTE: these libraries move quickly. If an import fails, pin to the versions
+# your environment resolves and check the LangChain / AG-UI / CopilotKit docs.

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+.pytest_cache/
+
+# Node / Next
+node_modules/
+.next/
+out/
+.env.local
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+
+# Workspaces (cloned/linked repos) — do not commit
+backend/workspaces/
+
+# graphify output (normally lives inside workspaces/; kept here defensively)
+graphify-out/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# NOTE: keep uv.lock COMMITTED for reproducible installs — do not ignore it.

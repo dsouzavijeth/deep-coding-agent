@@ -1,0 +1,37 @@
+[project]
+name = "deep-coding-agent-backend"
+version = "0.1.0"
+description = "Deep Coding Agent backend (deepagents + AG-UI + MongoDB + graphify)"
+requires-python = ">=3.11"
+dependencies = [
+    # Agent harness + models
+    "deepagents",
+    "langchain-openai",   # Nebius (OpenAI-compatible) + other OpenAI-style APIs
+    "langchain-anthropic",
+
+    # API + server
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "pydantic",
+    "pydantic-settings",
+    "watchfiles",         # filesystem watcher for live tree/viewer updates
+
+    # LangGraph runtime + MongoDB checkpointer
+    "langgraph",
+    "langgraph-checkpoint-mongodb",
+    "pymongo",
+
+    # AG-UI protocol + CopilotKit adapter
+    "ag-ui-langgraph",
+    "copilotkit",
+
+    # Per-repo graphify knowledge graph (ENABLE_GRAPHIFY=true)
+    "langchain-mcp-adapters",
+    "graphifyy[mcp]",     # the [mcp] extra ships the MCP server we launch
+]
+
+[tool.uv]
+# This is an application, not a library — don't try to build/install it as a
+# package; just manage the environment and dependencies.
+package = false

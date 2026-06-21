@@ -1,0 +1,257 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+/* Three columns: file tree · file viewer · chat (with approvals) */
+.workbench {
+  display: grid;
+  grid-template-columns: 280px 1fr 440px;
+  height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid #e5e5e5;
+  padding: 16px;
+  overflow: auto;
+  background: #fff;
+}
+
+.center {
+  min-width: 0;
+  overflow: auto;
+  background: #fdfdfd;
+}
+
+.chat {
+  border-left: 1px solid #e5e5e5;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.copilot-chat {
+  height: 100%;
+}
+
+.tree-file.active {
+  background: #eef4ff;
+  border-radius: 4px;
+}
+
+.repo-opener {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.repo-opener input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.repo-opener button {
+  padding: 6px 12px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dest-input {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 12px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.repo-meta {
+  font-size: 11.5px;
+  color: #666;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.repo-loc {
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+  margin-bottom: 2px;
+}
+
+.repo-graph {
+  color: #1f883d;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #888;
+  padding: 24px;
+  text-align: center;
+}
+
+/* File viewer */
+.viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer-head {
+  padding: 8px 14px;
+  border-bottom: 1px solid #ececec;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+  background: #fff;
+  position: sticky;
+  top: 0;
+}
+
+.viewer-body {
+  margin: 0;
+  padding: 14px;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+}
+
+/* Approval card + diff */
+.approval {
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  padding: 12px;
+  margin: 8px 0;
+  background: #fff;
+}
+
+.approval-head {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.approval-head code,
+.cmd {
+  font-family: ui-monospace, monospace;
+}
+
+.cmd {
+  background: #1e1e1e;
+  color: #eee;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow: auto;
+}
+
+.diff {
+  border: 1px solid #ececec;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.diff-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 8px;
+  white-space: pre;
+}
+
+.diff-line .sign {
+  width: 10px;
+  opacity: 0.7;
+}
+
+.diff-line.removed {
+  background: #ffeef0;
+  color: #b31d28;
+}
+
+.diff-line.added {
+  background: #e6ffed;
+  color: #22863a;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #d4d4d4;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn.approve {
+  background: #1f883d;
+  border-color: #1f883d;
+  color: #fff;
+}
+
+.btn.reject {
+  background: #fff;
+  color: #cf222e;
+  border-color: #e2c4c7;
+}
+
+/* Compact tool-call chips (theme-neutral: works on light or dark chat) */
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  margin: 4px 0;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.08);
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+  max-width: 100%;
+}
+
+.tool-chip .tool-icon {
+  opacity: 0.7;
+}
+
+.tool-chip .tool-name {
+  font-weight: 600;
+}
+
+.tool-chip .tool-detail {
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.tool-chip.running {
+  opacity: 0.85;
+}
