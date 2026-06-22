@@ -8,6 +8,7 @@ import { FileTree, type RepoSession } from "../components/FileTree";
 import { FileViewer } from "../components/FileViewer";
 import { ApprovalGate } from "../components/ApprovalGate";
 import { ToolRender } from "../components/ToolRender";
+import { OpenFileContext } from "../components/OpenFileContext";
 import { useRepoWatch } from "../components/useRepoWatch";
 
 export default function Home() {
@@ -15,13 +16,38 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   // Bumped whenever files actually change on disk; drives tree + viewer refetch.
   const [refreshTick, setRefreshTick] = useState(0);
+  // Width of the chat column (px); draggable via the resizer.
+  const [chatWidth, setChatWidth] = useState(440);
 
   // Real file-change events from the backend watcher (agent edits, shell output,
   // external changes). Refresh on anything that isn't filtered out server-side.
   useRepoWatch(session?.repoId, () => setRefreshTick((t) => t + 1));
 
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = chatWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX; // drag left → wider chat
+      setChatWidth(Math.min(900, Math.max(320, startW + delta)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
   return (
-    <div className="workbench">
+    <div
+      className="workbench"
+      style={{ gridTemplateColumns: `280px 1fr 6px ${chatWidth}px` }}
+    >
       <aside className="sidebar">
         <h3 style={{ marginTop: 0 }}>Deep Coding Agent</h3>
         <RepoOpener onOpen={setSession} />
@@ -58,6 +84,8 @@ export default function Home() {
         )}
       </section>
 
+      <div className="resizer" onMouseDown={startResize} title="Drag to resize chat" />
+
       <section className="chat">
         {session ? (
           <CopilotKit
@@ -69,6 +97,7 @@ export default function Home() {
                 update from the filesystem watcher, not from the approval click. */}
             <ApprovalGate />
             <ToolRender />
+            <OpenFileContext repoId={session.repoId} path={selectedFile} />
             <CopilotChat
               labels={{
                 title: `Agent · ${session.repoId}`,

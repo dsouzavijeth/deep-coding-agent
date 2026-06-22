@@ -87,9 +87,12 @@ deep-coding-agent/
     └── components/
         ├── FileTree.tsx        # clickable tree + openRepo() helper
         ├── RepoOpener.tsx      # clone URL / local path + optional destination
-        ├── FileViewer.tsx      # click a file to view its contents
+        ├── FolderBrowser.tsx   # server-side folder picker (Browse… modal)
+        ├── FileViewer.tsx      # syntax-highlighted, IDE-style file viewer
         ├── ApprovalGate.tsx    # renders edit/exec interrupts for approval
         ├── DiffView.tsx        # red/green diff used in the approval card
+        ├── ToolRender.tsx      # compact chips for agent tool calls
+        ├── OpenFileContext.tsx # shares the open file with the agent (readable)
         └── useRepoWatch.ts     # WebSocket hook: live file-change events
 ```
 
@@ -119,6 +122,7 @@ Backend (`backend/.env`):
 | `MONGODB_URI`              | `mongodb://localhost:27017`              | LangGraph checkpointer connection                              |
 | `MONGODB_DB`               | `deep_coding_agent`                      | Database name for checkpoints                                  |
 | `WORKSPACES_DIR`           | `./workspaces`                           | Default directory repos are cloned/linked into                 |
+| `AGENT_RECURSION_LIMIT`    | `100`                                    | LangGraph super-steps per run (raise if runs hit the limit)    |
 | `CORS_ORIGINS`             | `http://localhost:3000`                  | Comma-separated allowed frontend origins                       |
 | `ENABLE_GRAPHIFY`          | `false`                                  | Build + attach a per-repo graphify graph on open               |
 | `GRAPHIFY_EXTRACT_BACKEND` | _(unset)_                                | Backend for docs/PDF extraction; unset = code-only (no key)    |
@@ -128,6 +132,7 @@ Frontend (`frontend/.env.local`):
 | Variable                   | Default                 | Purpose                                          |
 | -------------------------- | ----------------------- | ------------------------------------------------ |
 | `NEXT_PUBLIC_AGENT_BACKEND`| `http://localhost:8000` | Backend base URL (also derives the `ws://` watch URL) |
+| `COPILOTKIT_TELEMETRY_DISABLED` | _(unset)_          | Set `true` to silence the CopilotKit runtime telemetry notice |
 
 ---
 
@@ -148,7 +153,9 @@ pip install -r requirements.txt
 # optional knowledge graph:
 # pip install "graphifyy[mcp]"
 cp .env.example .env          # add your NEBIUS_API_KEY (+ NEBIUS_MODEL)
-uvicorn app.main:app --reload --port 8000
+# --reload-dir app: watch only source, NOT the workspaces/ dir (cloning a repo
+# there would otherwise restart the server and wipe the in-process registry).
+uvicorn app.main:app --reload --reload-dir app --port 8000
 ```
 
 **3. Frontend**
@@ -171,6 +178,8 @@ and start chatting.
 | ------ | ------------------------- | --------------------------------------------- | -------------------------------------------------------- |
 | GET    | `/health`                 | —                                             | `{ "status": "ok" }`                                     |
 | GET    | `/config`                 | —                                             | `{ "workspaces_dir", "graphify" }`                       |
+| GET    | `/fs/list`                | `?path=<dir>` (omit for drives/root)          | `{ path, parent, entries:[{name,path}] }` — folder picker |
+| GET    | `/browse`                 | `?path=<dir>` (defaults to home)              | `{ path, parent, dirs }` — for the folder picker         |
 | POST   | `/repos`                  | `{ git_url?, local_path?, repo_id?, dest? }`  | `{ repo_id, agent_path, location, graphify, tree }`      |
 | GET    | `/repos/{repo_id}/tree`   | —                                             | nested `{ name, path, type, children }`                  |
 | GET    | `/repos/{repo_id}/file`   | `?path=<relative>`                            | `{ path, content }`                                      |
@@ -268,6 +277,11 @@ each repo runs isolated. Human-in-the-loop approval is enabled for `execute`,
 `write_file`, and `edit_file`, so nothing mutates the repo or shells out without
 your click — but approval is a guardrail, not a sandbox.
 
+The `/fs/list` endpoint (used by the Browse… folder picker) exposes the host's
+directory structure to any caller that can reach the backend. That's acceptable
+for local single-user dev — the agent already has full host access — but remove
+or lock it down for any networked or multi-user deployment.
+
 ---
 
 ## Troubleshooting
@@ -279,7 +293,9 @@ your click — but approval is a guardrail, not a sandbox.
 | Approval card doesn't render or the run hangs after approve         | The interrupt payload shape varies by version — adjust the parsing in `ApprovalGate.tsx` (`action_request.action` / `.args`, and the `accept`/`ignore` reply). |
 | Tree/viewer don't live-update                                       | Check `NEXT_PUBLIC_AGENT_BACKEND` is reachable; the watch socket is `ws(s)://<backend>/repos/{id}/watch`. Cross-origin WS in production needs an origin check.  |
 | Agent makes malformed tool calls / loops                            | Choose a strong tool-calling model in `NEBIUS_MODEL` (e.g. a larger Llama/Qwen/DeepSeek). Weak models struggle with the agent loop.                            |
+| `GraphRecursionError` / stream ends as `INCOMPLETE_STREAM`          | The run exceeded `AGENT_RECURSION_LIMIT` super-steps. Raise it — but if it's hit constantly, the model is likely looping, so try a stronger one.                |
 | `404` / "agent not found" on `/agent/{id}`                          | Routes are mounted in-process on repo open and are **not** persisted. After a backend restart, re-open the repo.                                               |
+| Cloning a repo restarts the server; tree `404`, watch `403`         | `--reload` was watching `workspaces/`. Launch with `--reload-dir app` so only source is watched, not the clone target.                                         |
 | CORS error in the browser                                           | Add the frontend origin to `CORS_ORIGINS` (comma-separated).                                                                                                   |
 | `git clone failed`                                                  | Verify the URL and access; private repos need credentials/SSH configured for the backend process.                                                             |
 
@@ -311,8 +327,8 @@ module-level `settings` instance is imported everywhere.
 - `tree(root)` → nested `{name, path, type, children}`, skipping `IGNORE` dirs.
 - `mount_default_agent(app, checkpointer)` — mounts `/agent/default`.
 - Routes: `POST /repos`, `GET /repos/{id}/tree`, `GET /repos/{id}/file`,
-  `GET /config`, and `WS /repos/{id}/watch` (uses `watchfiles`; a drain task stops
-  the watcher on disconnect).
+  `GET /config`, `GET /fs/list` (folder picker), and `WS /repos/{id}/watch` (uses
+  `watchfiles`; a drain task stops the watcher on disconnect).
 - `_REGISTRY: dict[repo_id, Path]` maps repos to workspaces for tree/file/watch.
 
 **`app/graphify.py`** — per-repo knowledge graph.
@@ -341,8 +357,21 @@ optional "clone into…" destination (shown for URLs), and a `/config` hint for 
 default dir. Calls `openRepo` and hands the session up.
 
 **`components/FileViewer.tsx`** — `FileViewer({repoId, path, refreshSignal})`:
-fetches `GET /repos/{id}/file?path=…` and shows it read-only; re-reads on
-`refreshSignal`.
+fetches `GET /repos/{id}/file?path=…` and shows it read-only with syntax
+highlighting (VS Code dark theme, line numbers, language by extension); re-reads
+on `refreshSignal`.
+
+**`components/FolderBrowser.tsx`** — `FolderBrowser({onPick, onClose})`: a modal
+that walks the host's folders via `GET /fs/list` and returns the chosen absolute
+path (the Browse… picker for the clone destination).
+
+**`components/ToolRender.tsx`** — `ToolRender()`: a catch-all
+`useCopilotAction({ name: "*", render })` that draws every agent tool call as a
+compact chip instead of CopilotKit's default card.
+
+**`components/OpenFileContext.tsx`** — `OpenFileContext({repoId, path})`: shares
+the open file (path + capped snippet) with the agent via `useCopilotReadable`, so
+"this file" / "the open file" resolve to what's in the viewer.
 
 **`components/ApprovalGate.tsx`** — `ApprovalGate({onResolved?})`: registers
 `useLangGraphInterrupt` and renders an approve/reject card (`DiffView` for edits,

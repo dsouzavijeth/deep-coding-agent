@@ -19,13 +19,17 @@ from deepagents import create_deep_agent
 from deepagents.backends import LocalShellBackend
 
 from .config import settings
+from .middleware import CopilotContextMiddleware
 
 SYSTEM_PROMPT = (
     "You are a coding assistant working inside a single repository. "
     "Plan before acting using your todo tool, read files before editing them, "
     "and explain what you changed. Prefer small, verifiable steps. "
     "If knowledge-graph tools (query_graph, shortest_path, get_neighbors) are "
-    "available, prefer them over grepping to understand how the code connects."
+    "available, prefer them over grepping to understand how the code connects. "
+    "Only use tools that are actually available to you — never invent or guess a "
+    "tool name. Once you have gathered enough context, always finish your turn "
+    "with a clear written answer or recommendation; do not stop after tool calls."
 )
 
 
@@ -39,7 +43,8 @@ def _model():
             model=settings.nebius_model,
             base_url=settings.nebius_base_url,
             api_key=settings.nebius_api_key,
-            temperature=0,
+            temperature=settings.nebius_temperature,
+            top_p=settings.nebius_top_p,
         )
     return settings.model  # e.g. "anthropic:claude-sonnet-4-6"
 
@@ -66,6 +71,9 @@ def build_agent(workspace: Path, checkpointer=None, tools: list | None = None):
         backend=backend,
         tools=tools or [],
         system_prompt=SYSTEM_PROMPT,
+        # Inject CopilotKit readables (e.g. the file open in the viewer) into the
+        # prompt — the AG-UI adapter only parks them in state otherwise.
+        middleware=[CopilotContextMiddleware()],
         # Pause for human approval before mutating files or shelling out. The
         # frontend renders these as a diff/approval card (see ApprovalGate).
         interrupt_on={"execute": True, "write_file": True, "edit_file": True},

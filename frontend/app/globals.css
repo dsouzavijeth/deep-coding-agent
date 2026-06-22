@@ -17,6 +17,7 @@ body {
   display: grid;
   grid-template-columns: 280px 1fr 440px;
   height: 100vh;
+  overflow: hidden; /* page itself never scrolls; each column scrolls on its own */
 }
 
 .sidebar {
@@ -35,12 +36,16 @@ body {
 .chat {
   border-left: 1px solid #e5e5e5;
   min-width: 0;
+  min-height: 0; /* lets the column bound its content instead of growing the page */
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #fff;
 }
 
 .copilot-chat {
+  flex: 1;
+  min-height: 0; /* critical: the inner message list scrolls, not the page */
   height: 100%;
 }
 
@@ -81,6 +86,241 @@ body {
   font-size: 12px;
 }
 
+.dest-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dest-row .dest-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.browse-btn {
+  padding: 6px 10px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Folder picker modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  width: 480px;
+  max-width: 92vw;
+  max-height: 70vh;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #ececec;
+}
+
+.modal-head button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.modal-path {
+  padding: 8px 14px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+  border-bottom: 1px solid #f0f0f0;
+  word-break: break-all;
+}
+
+.modal-list {
+  overflow: auto;
+  flex: 1;
+  padding: 6px 0;
+}
+
+.modal-row {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.modal-row:hover {
+  background: #f2f6ff;
+}
+
+.modal-row.up {
+  color: #555;
+}
+
+.modal-empty {
+  padding: 10px 14px;
+  color: #999;
+  font-size: 13px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid #ececec;
+}
+
+.modal-actions button {
+  padding: 6px 14px;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.modal-actions button.primary {
+  background: #1f883d;
+  border-color: #1f883d;
+  color: #fff;
+}
+
+.modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.browse-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 0 10px;
+}
+
+.browse-btn.small {
+  padding: 0 6px;
+  font-size: 14px;
+}
+
+.dest-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dest-row .dest-input {
+  margin-bottom: 0;
+}
+
+/* Folder picker modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: #fff;
+  color: #1a1a1a;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 70vh;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.modal-path {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+  background: #f5f5f5;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.modal-list {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  min-height: 160px;
+}
+
+.dir-row {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dir-row:hover {
+  background: #eef4ff;
+}
+
+.dir-row.up {
+  color: #555;
+}
+
+.dir-empty {
+  padding: 10px;
+  color: #999;
+  font-size: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.modal-actions button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #d4d4d4;
+  cursor: pointer;
+  font-size: 13px;
+  background: #fff;
+}
+
+.modal-actions .primary {
+  background: #1f883d;
+  border-color: #1f883d;
+  color: #fff;
+}
+
 .repo-meta {
   font-size: 11.5px;
   color: #666;
@@ -109,32 +349,29 @@ body {
   text-align: center;
 }
 
-/* File viewer */
+/* File viewer — dark IDE-style editor pane */
 .viewer {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: #1e1e1e;
 }
 
 .viewer-head {
   padding: 8px 14px;
-  border-bottom: 1px solid #ececec;
+  border-bottom: 1px solid #333;
   font-family: ui-monospace, monospace;
   font-size: 12px;
-  color: #555;
-  background: #fff;
+  color: #c9c9c9;
+  background: #252526;
   position: sticky;
   top: 0;
 }
 
 .viewer-body {
-  margin: 0;
-  padding: 14px;
-  font-family: ui-monospace, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  white-space: pre;
+  flex: 1;
   overflow: auto;
+  background: #1e1e1e;
 }
 
 /* Approval card + diff */
