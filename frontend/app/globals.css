@@ -370,8 +370,22 @@ body {
 
 .viewer-body {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden; /* Monaco manages its own scrolling */
   background: #1e1e1e;
+}
+
+/* Diff header bar (Approve/Reject live in the editor too) */
+.viewer-head.diff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diff-actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* Approval card + diff */
@@ -386,6 +400,24 @@ body {
 .approval-head {
   font-size: 13px;
   margin-bottom: 8px;
+}
+
+.approval-item {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.approval-item:last-of-type {
+  border-bottom: none;
+  margin-bottom: 4px;
+}
+
+.approval-desc {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+  white-space: pre-wrap;
 }
 
 .approval-head code,
@@ -406,6 +438,7 @@ body {
   border: 1px solid #ececec;
   border-radius: 6px;
   overflow: auto;
+  max-height: 320px;
   font-family: ui-monospace, monospace;
   font-size: 12px;
   margin-bottom: 8px;
@@ -423,6 +456,10 @@ body {
   opacity: 0.7;
 }
 
+.diff-line.context {
+  color: #57606a;
+}
+
 .diff-line.removed {
   background: #ffeef0;
   color: #b31d28;
@@ -431,6 +468,36 @@ body {
 .diff-line.added {
   background: #e6ffed;
   color: #22863a;
+}
+
+/* Drag handle between the viewer and the chat column */
+.resizer {
+  position: relative;
+  cursor: col-resize;
+  background: #d0d0d0;
+  transition: background 0.15s;
+  z-index: 5;
+}
+
+.resizer::after {
+  /* a wider invisible hit area so it's easy to grab */
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.resizer:hover,
+.resizer:active {
+  background: #6b7280;
+}
+
+/* Full-screen shield during a drag so Monaco/iframes don't eat the mouse */
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  cursor: col-resize;
+  user-select: none;
 }
 
 .approval-actions {

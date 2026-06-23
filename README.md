@@ -3,9 +3,10 @@
 A coding agent — like a self-hosted Claude Code / Cursor — built on LangChain's
 **deepagents** harness and exposed through a **CopilotKit + AG-UI** frontend. It
 operates on **any repository**: clone a GitHub URL or load a local path, then chat
-with an agent scoped to that repo. Edits and shell commands pause for approval
-(shown as diffs), a file viewer and tree stay in sync via a filesystem watcher,
-and each repo can get its own **graphify** knowledge graph.
+with an agent scoped to that repo. Edits and shell commands pause for approval —
+proposed edits appear as a **diff in the Monaco editor** (and a compact card in
+chat), approvable from either, kept in sync. A file tree and editor track disk via
+a filesystem watcher, and each repo can get its own **graphify** knowledge graph.
 
 ---
 
@@ -45,7 +46,7 @@ React (CopilotKit UI)  ──►  CopilotKit Runtime (Next route)  ──►  AG
 3. `build_agent()` compiles a deepagents graph rooted at the workspace, and it is
    mounted as an AG-UI endpoint at `/agent/{repo_id}`.
 4. The response (`repo_id`, `agent_path`, `location`, `graphify`, `tree`) is
-   stored as the session. The frontend renders the tree + viewer, opens the watch
+   stored as the session. The frontend renders the tree + editor, opens the watch
    WebSocket, and points CopilotKit at the repo's agent.
 
 **Chatting and editing**
@@ -55,10 +56,16 @@ React (CopilotKit UI)  ──►  CopilotKit Runtime (Next route)  ──►  AG
 2. The deepagents graph runs on a MongoDB-checkpointed thread. When it calls
    `edit_file` / `write_file` / `execute`, `interrupt_on` **pauses** the run.
 3. The interrupt reaches the browser via AG-UI; `useLangGraphInterrupt` →
-   `ApprovalGate` renders a diff (or command) with Approve / Reject.
+   `ApprovalGate` publishes it to `interruptStore`. `EditorPane` shows the
+   original→proposed **diff in Monaco** with Approve / Reject; chat shows a compact
+   card for the same decision. Either one resolves the same interrupt.
 4. On approve, the graph resumes and the write hits disk. `watchfiles` detects
    it, the watch WebSocket pushes the change, `useRepoWatch` bumps the refresh
-   signal, and the tree + viewer refetch.
+   signal, and the tree + editor refetch.
+
+> The file you have open is shared with the agent as CopilotKit readable context;
+> a backend `CopilotContextMiddleware` injects it into the prompt so "this file"
+> resolves to what's in the editor (see Module reference).
 
 ---
 
@@ -74,27 +81,32 @@ deep-coding-agent/
 │       ├── main.py             # FastAPI app, lifespan, checkpointer, CORS, shutdown
 │       ├── config.py           # env settings (Nebius/Anthropic, Mongo, graphify)
 │       ├── agent.py            # _model() + build_agent(): repo-rooted, gated edits
+│       ├── middleware.py       # injects the open-file context into the prompt
 │       ├── workspaces.py       # clone/local, AG-UI mount, tree, file read, watch (WS)
 │       └── graphify.py         # extract → serve MCP → load tools, per repo
 └── frontend/
-    ├── package.json
+    ├── package.json            # incl. @monaco-editor/react
     ├── .env.local.example
     ├── app/
     │   ├── layout.tsx
-    │   ├── page.tsx            # workbench: tree · file viewer · chat
+    │   ├── page.tsx            # workbench: tree · Monaco editor · chat (+ resizer)
     │   ├── globals.css
     │   └── api/copilotkit/route.ts   # CopilotKit runtime (per-repo agent by header)
     └── components/
         ├── FileTree.tsx        # clickable tree + openRepo() helper
         ├── RepoOpener.tsx      # clone URL / local path + optional destination
         ├── FolderBrowser.tsx   # server-side folder picker (Browse… modal)
-        ├── FileViewer.tsx      # syntax-highlighted, IDE-style file viewer
-        ├── ApprovalGate.tsx    # renders edit/exec interrupts for approval
-        ├── DiffView.tsx        # red/green diff used in the approval card
+        ├── EditorPane.tsx      # Monaco editor; inline diff + approve when editing
+        ├── ApprovalGate.tsx    # captures edit/exec interrupts; compact chat card
+        ├── interruptStore.ts   # bridges the interrupt between chat and editor
         ├── ToolRender.tsx      # compact chips for agent tool calls
         ├── OpenFileContext.tsx # shares the open file with the agent (readable)
         └── useRepoWatch.ts     # WebSocket hook: live file-change events
 ```
+
+> `FileViewer.tsx` (syntax-highlighted read-only viewer) and `DiffView.tsx`
+> (hand-rolled red/green diff) were superseded by `EditorPane.tsx` + Monaco's
+> `DiffEditor`; they may still be present but are no longer imported.
 
 ---
 
@@ -170,6 +182,10 @@ npm run dev
 Open http://localhost:3000, paste a GitHub URL (or a local path) in the sidebar,
 and start chatting.
 
+> The editor is **Monaco** (`@monaco-editor/react`), which loads its core from a
+> CDN on first paint — the editor needs internet access the first time. Drag the
+> divider between the editor and chat to resize the chat column.
+
 ---
 
 ## API reference
@@ -227,20 +243,29 @@ repo in place. The sidebar shows exactly where each repo landed.
 When you ask the agent to change code, it calls `edit_file` / `write_file` on the
 repo (a symlink to your real repo for local paths; the clone under
 `WORKSPACES_DIR` for git URLs). These — along with `execute` — are gated by
-`interrupt_on` in `agent.py`, so each edit or shell command **pauses** and
-surfaces in the chat as an approval card: file edits show a red/green **diff**
-(`ApprovalGate` + `DiffView`), commands show the command line. Approve to apply,
-reject to skip. Clicking a file in the tree opens it read-only in the center
-**viewer**, which re-reads after an approved edit.
+`interrupt_on` in `agent.py`, so each edit or shell command **pauses**. The
+interrupt is captured by `ApprovalGate` and published to `interruptStore`, which
+both the chat and the editor read:
 
-> The exact shape of the deepagents human-in-the-loop interrupt payload (and the
-> `accept` / `ignore` resume values) can vary across versions. If approvals don't
-> render or resume cleanly, adjust the payload parsing in `ApprovalGate.tsx`
-> against your installed deepagents + CopilotKit versions.
+- **Editor** (`EditorPane`) opens the target file and shows the original→proposed
+  change as an inline **Monaco diff**, with Approve / Reject in the header.
+- **Chat** shows a compact card for the same decision (file edits point you to the
+  editor; `execute` shows the command line, since there's no file to diff).
+
+Approving or rejecting from *either* place resolves the same interrupt, so they
+stay in sync. The diff is reconstructed client-side for preview (for `edit_file`,
+`old_string`→`new_string` applied to the current file; for `write_file`, the new
+contents); the actual write is performed by the agent on approval and lands via
+the watcher.
+
+The HITL contract is deepagents' current one: the interrupt value is
+`{ action_requests: [{ name, args, description? }], … }` and the resume value is
+`{ decisions: [{ type: "approve" | "reject" }, …] }` (one decision per action).
+`ApprovalGate.tsx` parses and emits exactly that.
 
 ### Live sync
 
-The tree and viewer update from a real filesystem watcher, not by guessing after
+The tree and editor update from a real filesystem watcher, not by guessing after
 an approval. The backend watches the workspace with `watchfiles` and streams
 add/modify/delete events over a WebSocket (`/repos/{id}/watch`); the frontend
 `useRepoWatch` hook subscribes and refreshes. This reflects *any* change — agent
@@ -291,7 +316,7 @@ or lock it down for any networked or multi-user deployment.
 | `Transaction numbers are only allowed on a replica set` (Mongo)     | Use the single-node replica-set service commented into `docker-compose.yml` and append `?replicaSet=rs0` to `MONGODB_URI`.                                     |
 | `ModuleNotFoundError: graphify` / `python -m graphify.serve` fails  | graphify must be installed in the **backend venv** (`pip install "graphifyy[mcp]"`), not via `uv tool`/`pipx` in another environment.                          |
 | Approval card doesn't render or the run hangs after approve         | The interrupt payload shape varies by version — adjust the parsing in `ApprovalGate.tsx` (`action_request.action` / `.args`, and the `accept`/`ignore` reply). |
-| Tree/viewer don't live-update                                       | Check `NEXT_PUBLIC_AGENT_BACKEND` is reachable; the watch socket is `ws(s)://<backend>/repos/{id}/watch`. Cross-origin WS in production needs an origin check.  |
+| Tree/editor don't live-update                                       | Check `NEXT_PUBLIC_AGENT_BACKEND` is reachable; the watch socket is `ws(s)://<backend>/repos/{id}/watch`. Cross-origin WS in production needs an origin check.  |
 | Agent makes malformed tool calls / loops                            | Choose a strong tool-calling model in `NEBIUS_MODEL` (e.g. a larger Llama/Qwen/DeepSeek). Weak models struggle with the agent loop.                            |
 | `GraphRecursionError` / stream ends as `INCOMPLETE_STREAM`          | The run exceeded `AGENT_RECURSION_LIMIT` super-steps. Raise it — but if it's hit constantly, the model is likely looping, so try a stronger one.                |
 | `404` / "agent not found" on `/agent/{id}`                          | Routes are mounted in-process on repo open and are **not** persisted. After a backend restart, re-open the repo.                                               |
@@ -316,9 +341,18 @@ module-level `settings` instance is imported everywhere.
   `NEBIUS_API_KEY` is set, else the `MODEL` provider string (imported lazily).
 - `build_agent(workspace, checkpointer=None, tools=None)` → a compiled deepagents
   graph rooted at `workspace` via `LocalShellBackend`, with `tools` merged in,
-  `interrupt_on` gating `execute`/`write_file`/`edit_file`, and the checkpointer.
+  `interrupt_on` gating `execute`/`write_file`/`edit_file`, the checkpointer, and
+  `middleware=[CopilotContextMiddleware()]`.
   **This is the single place to change the backend (sandbox), the system prompt,
   or which tools the agent gets.**
+
+**`app/middleware.py`** — `CopilotContextMiddleware` (a deepagents/LangChain
+`AgentMiddleware`). The AG-UI adapter parks CopilotKit readables (e.g. the open
+file from `OpenFileContext`) in `state["ag-ui"]["context"]` but never prompts with
+them. This middleware (a) extends state so LangGraph keeps the `ag-ui` channel,
+and (b) in `wrap_model_call`/`awrap_model_call` appends those readables to the
+system prompt — so "review this file" resolves to the editor's file. (Context
+items are `ag-ui` `Context` objects, read by attribute, not dict access.)
 
 **`app/workspaces.py`** — the repos `APIRouter`.
 - `NewRepo` — request model: `git_url? | local_path?`, plus `repo_id?`, `dest?`.
@@ -356,10 +390,12 @@ refetches on `refreshSignal`.
 optional "clone into…" destination (shown for URLs), and a `/config` hint for the
 default dir. Calls `openRepo` and hands the session up.
 
-**`components/FileViewer.tsx`** — `FileViewer({repoId, path, refreshSignal})`:
-fetches `GET /repos/{id}/file?path=…` and shows it read-only with syntax
-highlighting (VS Code dark theme, line numbers, language by extension); re-reads
-on `refreshSignal`.
+**`components/EditorPane.tsx`** — `EditorPane({repoId, path, refreshSignal})`: the
+center pane, a read-only **Monaco** editor of the selected file (language by
+extension, VS Code dark theme). When `interruptStore` holds a pending
+`edit_file`/`write_file`, it instead renders Monaco's inline `DiffEditor`
+(original vs proposed) with Approve / Reject, resolving that interrupt. Replaces
+the old `FileViewer`.
 
 **`components/FolderBrowser.tsx`** — `FolderBrowser({onPick, onClose})`: a modal
 that walks the host's folders via `GET /fs/list` and returns the chosen absolute
@@ -371,21 +407,26 @@ compact chip instead of CopilotKit's default card.
 
 **`components/OpenFileContext.tsx`** — `OpenFileContext({repoId, path})`: shares
 the open file (path + capped snippet) with the agent via `useCopilotReadable`, so
-"this file" / "the open file" resolve to what's in the viewer.
+"this file" / "the open file" resolve to what's in the editor. (Reaches the model
+through the backend `CopilotContextMiddleware`.)
 
 **`components/ApprovalGate.tsx`** — `ApprovalGate({onResolved?})`: registers
-`useLangGraphInterrupt` and renders an approve/reject card (`DiffView` for edits,
-command text for `execute`); resolves `[{type:"accept"}]` / `[{type:"ignore"}]`.
+`useLangGraphInterrupt`, normalizes the `action_requests`, publishes them (with
+`resolve`) to `interruptStore`, and renders a compact chat card (edit notice, or
+command text for `execute`). Resolves `{ decisions: [{type:"approve"|"reject"}] }`,
+one per action.
 
-**`components/DiffView.tsx`** — `DiffView({oldText?, newText?})`: stacked red
-(removed) / green (added) line blocks.
+**`components/interruptStore.ts`** — a tiny external store (`set/clear/subscribe/
+get`, content-keyed to avoid re-fires) that bridges the pending interrupt between
+`ApprovalGate` (in the CopilotKit provider) and `EditorPane` (outside it). Either
+pane resolves the same interrupt.
 
 **`components/useRepoWatch.ts`** — `useRepoWatch(repoId, onChanges)`: opens the
 watch WebSocket (`http→ws`), calls `onChanges(paths)` per change batch,
 auto-reconnects.
 
 **`app/page.tsx`** — the workbench: holds `session` / `selectedFile` /
-`refreshTick`, wires `useRepoWatch` to bump `refreshTick`, renders tree + viewer +
+`refreshTick`, wires `useRepoWatch` to bump `refreshTick`, renders tree + editor +
 `CopilotKit`/`CopilotChat` with `ApprovalGate`.
 
 **`app/api/copilotkit/route.ts`** — `POST` handler that reads `x-agent-id` and

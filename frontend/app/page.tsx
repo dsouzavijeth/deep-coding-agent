@@ -5,7 +5,7 @@ import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { RepoOpener } from "../components/RepoOpener";
 import { FileTree, type RepoSession } from "../components/FileTree";
-import { FileViewer } from "../components/FileViewer";
+import { EditorPane } from "../components/EditorPane";
 import { ApprovalGate } from "../components/ApprovalGate";
 import { ToolRender } from "../components/ToolRender";
 import { OpenFileContext } from "../components/OpenFileContext";
@@ -18,6 +18,7 @@ export default function Home() {
   const [refreshTick, setRefreshTick] = useState(0);
   // Width of the chat column (px); draggable via the resizer.
   const [chatWidth, setChatWidth] = useState(440);
+  const [isResizing, setIsResizing] = useState(false);
 
   // Real file-change events from the backend watcher (agent edits, shell output,
   // external changes). Refresh on anything that isn't filtered out server-side.
@@ -27,6 +28,7 @@ export default function Home() {
     e.preventDefault();
     const startX = e.clientX;
     const startW = chatWidth;
+    setIsResizing(true);
     const onMove = (ev: MouseEvent) => {
       const delta = startX - ev.clientX; // drag left → wider chat
       setChatWidth(Math.min(900, Math.max(320, startW + delta)));
@@ -34,13 +36,10 @@ export default function Home() {
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      setIsResizing(false);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
   };
 
   return (
@@ -74,7 +73,7 @@ export default function Home() {
 
       <section className="center">
         {session ? (
-          <FileViewer
+          <EditorPane
             repoId={session.repoId}
             path={selectedFile}
             refreshSignal={refreshTick}
@@ -85,6 +84,8 @@ export default function Home() {
       </section>
 
       <div className="resizer" onMouseDown={startResize} title="Drag to resize chat" />
+      {/* While dragging, this overlay grabs the mouse so Monaco/iframes don't. */}
+      {isResizing && <div className="drag-overlay" />}
 
       <section className="chat">
         {session ? (

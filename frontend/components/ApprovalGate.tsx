@@ -1,15 +1,15 @@
 "use client";
 
-// Renders deepagents' human-in-the-loop interrupts (gated by `interrupt_on` on
-// the backend) as an approve/reject card that shows a diff/preview BEFORE you
-// decide. Mounted inside the CopilotKit provider; the card appears in the chat.
+// Captures deepagents' HITL interrupts and (1) publishes them to interruptStore
+// so the editor can show the diff + Approve/Reject, and (2) renders a compact
+// chat card. File edits are reviewed in the editor; `execute` shows its command
+// here. Approving/rejecting from either place resolves the same interrupt.
 //
-// Schema (deepagents HumanInTheLoopMiddleware):
-//   interrupt value  -> { action_requests: [{ name, args, description? }], review_configs: [...] }
-//   resume value     -> { decisions: [{ type: "approve" } | { type: "reject" }, ...] }  (one per action)
+//   interrupt value -> { action_requests: [{ name, args, description? }], review_configs: [...] }
+//   resume value    -> { decisions: [{ type: "approve" | "reject" }, ...] }  (one per action)
 
 import { useLangGraphInterrupt } from "@copilotkit/react-core";
-import { DiffView } from "./DiffView";
+import { interruptStore } from "./interruptStore";
 
 type ActionRequest = {
   name: string;
@@ -17,8 +17,6 @@ type ActionRequest = {
   description?: string;
 };
 
-// The interrupt value may arrive as an object or a JSON string; older/alternate
-// shapes are normalized to the current action_requests form.
 function normalize(raw: any): ActionRequest[] {
   let v = raw;
   if (typeof v === "string") {
@@ -38,19 +36,6 @@ function normalize(raw: any): ActionRequest[] {
   }));
 }
 
-function ActionPreview({ name, args }: { name: string; args: Record<string, any> }) {
-  if (name === "edit_file") {
-    return <DiffView oldText={String(args.old_string ?? "")} newText={String(args.new_string ?? "")} />;
-  }
-  if (name === "write_file") {
-    return <DiffView newText={String(args.content ?? "")} />;
-  }
-  if (name === "execute") {
-    return <pre className="cmd">{String(args.command ?? "")}</pre>;
-  }
-  return <pre className="cmd">{JSON.stringify(args, null, 2)}</pre>;
-}
-
 export function ApprovalGate({
   onResolved,
 }: {
@@ -61,29 +46,36 @@ export function ApprovalGate({
       const actions = normalize((event as any)?.value);
       const count = actions.length || 1;
 
+      // Publish to the store (deferred so we don't set state during render) so
+      // the editor can render the diff. Keyed by content to avoid re-fires.
+      const key = JSON.stringify(actions);
+      queueMicrotask(() => interruptStore.set({ actions, resolve }, key));
+
       const decide = (type: "approve" | "reject") => {
-        // One decision per action request, in order.
         resolve({ decisions: Array.from({ length: count }, () => ({ type })) });
+        interruptStore.clear();
         onResolved?.(type === "approve");
       };
 
+      const fileEdits = actions.filter(
+        (a) => a.name === "edit_file" || a.name === "write_file",
+      );
+      const commands = actions.filter((a) => a.name === "execute");
+
       return (
         <div className="approval">
-          {actions.length === 0 && (
-            <div className="approval-head">Approve this action?</div>
-          )}
-          {actions.map((a, i) => (
-            <div key={i} className="approval-item">
+          {fileEdits.map((a, i) => (
+            <div key={`f${i}`} className="approval-head">
+              ✎ <code>{a.name}</code> on <code>{String(a.args?.file_path ?? "")}</code>{" "}
+              — review the diff in the editor →
+            </div>
+          ))}
+          {commands.map((a, i) => (
+            <div key={`c${i}`}>
               <div className="approval-head">
-                <code>{a.name === "execute" ? "run command" : a.name}</code>
-                {a.args?.file_path && (
-                  <>
-                    {" "}
-                    on <code>{String(a.args.file_path)}</code>
-                  </>
-                )}
+                <code>run command</code>
               </div>
-              <ActionPreview name={a.name} args={a.args ?? {}} />
+              <pre className="cmd">{String(a.args?.command ?? "")}</pre>
             </div>
           ))}
 

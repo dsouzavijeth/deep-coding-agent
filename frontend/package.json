@@ -13,6 +13,7 @@
     "@copilotkit/react-core": "latest",
     "@copilotkit/react-ui": "latest",
     "@copilotkit/runtime": "latest",
+    "@monaco-editor/react": "^4.6.0",
     "@monaco-editor/react": "latest",
     "next": "^15.0.0",
     "react": "^18.3.0",
