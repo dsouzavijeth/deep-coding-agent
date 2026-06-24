@@ -11,6 +11,12 @@ live **diff in a Monaco editor** that stays in sync with the chat.
 
 ---
 
+## Demo
+
+https://github.com/user-attachments/assets/8bc6f3e3-2ce9-47e3-a2f3-a735be1b6933
+
+---
+
 ## Features
 
 - **Works on any repo** — clone a URL or symlink a local path; the agent's file
