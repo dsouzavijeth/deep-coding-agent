@@ -30,9 +30,9 @@ https://github.com/user-attachments/assets/8bc6f3e3-2ce9-47e3-a2f3-a735be1b6933
   editor; no optimistic guessing.
 - **Durable threads** — conversations are checkpointed in MongoDB and resume
   across restarts.
-- **Optional knowledge graph** — each repo can get a per-repo
+- **Per-repo knowledge graph** — on by default, each repo gets a
   [graphify](https://pypi.org/project/graphifyy/) graph the agent queries instead
-  of grepping.
+  of grepping (set `ENABLE_GRAPHIFY=false` to skip).
 
 ---
 
@@ -70,6 +70,7 @@ install or Docker), and a `NEBIUS_API_KEY` (or `ANTHROPIC_API_KEY`).
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+pip install "graphifyy[mcp]"    # graphify is ON by default; or set ENABLE_GRAPHIFY=false
 cp .env.example .env            # add NEBIUS_API_KEY (+ NEBIUS_MODEL)
 uvicorn app.main:app --reload --reload-dir app --port 8000
 
@@ -98,11 +99,11 @@ Essential backend env vars (`backend/.env`) — see
 | Variable          | Default                                  | Purpose                                  |
 | ----------------- | ---------------------------------------- | ---------------------------------------- |
 | `NEBIUS_API_KEY`  | _(unset)_                                | If set, the agent uses Nebius            |
-| `NEBIUS_MODEL`    | `Qwen/Qwen2.5-Coder-32B-Instruct`        | Model id — **must support tool calling** |
+| `NEBIUS_MODEL`    | `nvidia/nemotron-3-super-120b-a12b`      | Model id — **must support tool calling** |
 | `NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1` | OpenAI-compatible LLM base URL           |
 | `MONGODB_URI`     | `mongodb://localhost:27017`              | Checkpointer connection                  |
 | `WORKSPACES_DIR`  | `./workspaces`                           | Where repos are cloned/linked            |
-| `ENABLE_GRAPHIFY` | `false`                                  | Build a per-repo graphify graph on open  |
+| `ENABLE_GRAPHIFY` | `true`                                   | Build a per-repo graphify graph on open (needs `graphifyy[mcp]`) |
 
 Frontend (`frontend/.env.local`): `NEXT_PUBLIC_AGENT_BACKEND`
 (default `http://localhost:8000`).
