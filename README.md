@@ -57,12 +57,14 @@ React (CopilotKit UI) ──► CopilotKit Runtime (Next route) ──► AG-UI 
 
 ## Quick start
 
-**Prerequisites:** Python 3.11+, Node 20+, Git, Docker (for MongoDB), and a
-`NEBIUS_API_KEY` (or `ANTHROPIC_API_KEY`).
+**Prerequisites:** Python 3.11+, Node 20+, Git, a running **MongoDB** (local
+install or Docker), and a `NEBIUS_API_KEY` (or `ANTHROPIC_API_KEY`).
 
 ```bash
-# 1. MongoDB
-docker compose up -d
+# 1. MongoDB — use whichever you have:
+#    • Local install: just ensure mongod is running on the default port 27017.
+#      (MongoDB Compass is a GUI to inspect it — not the server itself.)
+#    • Docker:        docker compose up -d
 
 # 2. Backend
 cd backend
@@ -84,6 +86,7 @@ chatting.
 > `--reload-dir app` is important: it stops the reloader from watching the
 > `workspaces/` clone target (which would restart the server on every clone).
 > The Monaco editor loads its core from a CDN on first paint (needs internet once).
+> The default `MONGODB_URI` (`mongodb://localhost:27017`) targets a local MongoDB.
 
 ---
 
