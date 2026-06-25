@@ -31,22 +31,31 @@ about how the stack is glued together. This is that story.
 
 **Contents**
 
-1. [The shape of the thing](#the-shape-of-the-thing)
-2. [Rooting an agent at any repo](#rooting-an-agent-at-any-repo)
-3. [Picking the agent from the frontend](#picking-the-agent-from-the-frontend)
-4. [The model and the prompt](#the-model-and-the-prompt)
-5. [The checkpointer reality](#the-checkpointer-reality)
-6. [Making the agent aware of your open file](#making-the-agent-aware-of-your-open-file)
-7. [Human-in-the-loop, done right](#human-in-the-loop-done-right)
-8. [Bringing the diff into the editor](#bringing-the-diff-into-the-editor)
-9. [Live sync without optimistic UI](#live-sync-without-optimistic-ui)
-10. [graphify](#graphify-a-per-repo-knowledge-graph) · [Operational notes](#a-few-more-operational-notes) · [How this got built (MCP)](#how-this-got-built-the-docs-were-mcp-servers)
-11. [Config](#configuration-reference) · [Version pins](#version-pins) · [API](#api-reference) · [Modules](#module-reference) · [Extending](#extending-it) · [Security](#security--productionizing) · [Troubleshooting](#troubleshooting)
+- [Building a self-hosted Cursor: a coding agent on deepagents + CopilotKit + AG-UI](#building-a-self-hosted-cursor-a-coding-agent-on-deepagents--copilotkit--ag-ui)
+  - [The shape of the thing](#the-shape-of-the-thing)
+  - [Rooting an agent at any repo](#rooting-an-agent-at-any-repo)
+  - [Picking the agent from the frontend](#picking-the-agent-from-the-frontend)
+  - [The model and the prompt](#the-model-and-the-prompt)
+  - [The checkpointer reality](#the-checkpointer-reality)
+  - [Making the agent aware of your open file](#making-the-agent-aware-of-your-open-file)
+  - [Human-in-the-loop, done right](#human-in-the-loop-done-right)
+  - [Bringing the diff into the editor](#bringing-the-diff-into-the-editor)
+  - [Live sync without optimistic UI](#live-sync-without-optimistic-ui)
+  - [graphify: a per-repo knowledge graph](#graphify-a-per-repo-knowledge-graph)
+  - [A few more operational notes](#a-few-more-operational-notes)
+  - [Configuration reference](#configuration-reference)
+  - [Version pins](#version-pins)
+  - [API reference](#api-reference)
+  - [Module reference](#module-reference)
+    - [Backend](#backend)
+    - [Frontend](#frontend)
+  - [Extending it](#extending-it)
+  - [Security \& productionizing](#security--productionizing)
+  - [Troubleshooting](#troubleshooting)
+  - [How this got built: the docs were MCP servers](#how-this-got-built-the-docs-were-mcp-servers)
+  - [Closing thoughts](#closing-thoughts)
 
 ---
-
-> 📷 _**Screenshot:** the workbench — file tree (left), Monaco editor (center),
-> chat with tool chips (right). A good hero image for the article._
 
 ## The shape of the thing
 
@@ -540,8 +549,6 @@ One layout gotcha worth stealing: while dragging the chat-resizer, a full-screen
 `position: fixed` overlay grabs the mouse. Without it, Monaco swallows the
 `mousemove` the instant your cursor crosses the editor and the drag dies.
 
-> 📷 _**GIF:** ask for an edit → the inline Monaco diff appears in the editor with
-> Approve/Reject → approve → the file updates live. This is the money shot._
 
 (Before Monaco, the chat card used a hand-rolled **LCS line diff** — context lines
 plus only the changed `+`/`-` lines, with an `m*n` guard against pathological
