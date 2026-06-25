@@ -153,8 +153,7 @@ endpoints), and a troubleshooting catalog of the bugs hit along the way — incl
 how the agent is made aware of your open file, and how the editor and chat stay in
 sync on approvals.
 
-> 🛠️ Built with **Claude Code**, with the **LangChain** (`docs.langchain.com/mcp`)
-> and **CopilotKit** (`mcp.copilotkit.ai`) docs/source **MCP servers** connected —
+> 🛠️ Built with **Claude Code**, with the **LangChain** and **CopilotKit** docs/source **MCP servers** connected —
 > reading the real adapter source over MCP, instead of guessing at fast-moving APIs,
 > is what made the tricky integration seams tractable. See
 > [the deep-dive](./ARTICLE.md#how-this-got-built-the-docs-were-mcp-servers).
