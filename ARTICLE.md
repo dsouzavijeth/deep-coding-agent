@@ -40,7 +40,7 @@ about how the stack is glued together. This is that story.
 7. [Human-in-the-loop, done right](#human-in-the-loop-done-right)
 8. [Bringing the diff into the editor](#bringing-the-diff-into-the-editor)
 9. [Live sync without optimistic UI](#live-sync-without-optimistic-ui)
-10. [graphify](#graphify-a-per-repo-knowledge-graph) · [Operational notes](#a-few-more-operational-notes)
+10. [graphify](#graphify-a-per-repo-knowledge-graph) · [Operational notes](#a-few-more-operational-notes) · [How this got built (MCP)](#how-this-got-built-the-docs-were-mcp-servers)
 11. [Config](#configuration-reference) · [Version pins](#version-pins) · [API](#api-reference) · [Modules](#module-reference) · [Extending](#extending-it) · [Security](#security--productionizing) · [Troubleshooting](#troubleshooting)
 
 ---
@@ -894,6 +894,42 @@ caching/eviction, instead of one route per repo.
 
 ---
 
+## How this got built: the docs were MCP servers
+
+Worth saying plainly, because it's the reason the seams above got *solved* rather
+than guessed at: I built this in **Claude Code** with two documentation servers
+wired in over **MCP** — and that changed how the hard parts went.
+
+- **The LangChain docs MCP server** (`docs.langchain.com/mcp`) — search across
+  LangChain / LangGraph / deepagents docs.
+- **The CopilotKit MCP server** (`mcp.copilotkit.ai`) — search over CopilotKit's
+  docs *and source*, plus the AG-UI protocol docs and the AG-UI SDK source.
+
+The distinction that mattered is the last one: those servers expose **source code
+search**, not just prose. Almost every bug in this article was a mismatch between
+what I assumed an API did and what it actually does in the installed version — the
+kind of thing training data and quickstarts get subtly wrong for fast-moving
+libraries. With the source a query away, the loop became "read the adapter, then
+write against it" instead of "write, run, read the traceback, repeat." Concretely:
+
+- Finding that AG-UI parks readable context at `state["ag-ui"]["context"]` — and
+  that CopilotKit's own middleware is what normally lifts it into the prompt — came
+  from searching the AG-UI adapter source, not from docs.
+- The exact deepagents human-in-the-loop schema (`{action_requests}` in,
+  `{decisions:[{type:"approve"}]}` out) came from reading
+  `HumanInTheLoopMiddleware` directly — after the guessed `accept`/`ignore` shape
+  crashed.
+- Confirming `create_deep_agent` accepts a `middleware=[…]` argument, and that
+  `LangGraphHttpAgent` lives in `@ag-ui/langgraph` (not `@ag-ui/client`), were
+  both one source search each.
+
+If you're rebuilding this — or anything on a stack this young — connect the docs and
+source as MCP servers in your coding agent before you start. The seams are where
+you'll spend your time, and the fastest way through a seam is to read the code on
+the other side of it.
+
+---
+
 ## Closing thoughts
 
 The lesson that kept repeating: when two fast-moving frameworks meet, the bugs
@@ -901,7 +937,8 @@ cluster at the seam. Readable context that lands in state instead of the prompt;
 interrupt schema that's a dict-of-decisions, not a list; typed objects where you
 assumed dicts; a reloader that watches the directory your agent writes into. None
 of these are in any quickstart — they're what you find by reading the adapter
-source and the tracebacks. Once each seam is understood, the parts compose into
+source and the tracebacks, which is exactly why wiring the docs and source in as
+MCP servers paid for itself. Once each seam is understood, the parts compose into
 something genuinely useful: a coding agent, scoped to your repo, that shows you the
 diff and waits for your nod.
 
